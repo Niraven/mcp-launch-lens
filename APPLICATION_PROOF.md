@@ -6,7 +6,7 @@
 - Manufact Cloud dashboard: https://manufact.com/cloud/org-bb5b108a-sifrx/servers/38b23d2a-f688-47b7-8425-59e143dcd6e1
 - Inspector: https://inspector.manufact.com/inspector?autoConnect=https%3A%2F%2Fkeen-steel-bs1nz.run.mcp-use.com%2Fmcp
 - Public GitHub proof repo: https://github.com/Niraven/mcp-launch-lens
-- Widget screenshot: `launch-lens-widget-cropped.png`
+- Widget screenshot: `launch-lens-redesign.png`
 
 ## Verified output
 
@@ -42,3 +42,9 @@ MCP Launch Lens is not just another security scanner. It is a launch-readiness l
 I built MCP Launch Lens as a live Manufact Cloud demo for teams shipping MCP integrations. The app audits an MCP server’s tool surface and turns it into a visual launch-readiness scorecard across trust, tool UX, docs, observability, marketplace readiness, and partnerships. The key point is that MCP launch is not only about whether a server works; it is whether users and partner teams can trust it, understand it, monitor it, and tell a clear story around it.
 
 The live MCP URL is deployed on Manufact Cloud, and the dashboard gives the operational layer: analytics, logs, evals, observability, and deployment status. The widget makes the output concrete inside the MCP client experience, while the companion tools generate partner briefs and compare launch paths across Manufact, ChatGPT Apps, Claude, and generic agent clients.
+
+
+## UI redesign proof
+
+- Rebuilt widget with shadcn/Vercel/Linear-style components.
+- Visual proof: `launch-lens-redesign.png`.
