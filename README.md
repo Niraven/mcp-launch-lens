@@ -63,6 +63,12 @@ http://localhost:3000/inspector
 }
 ```
 
+## Live deployment
+
+- MCP URL: https://keen-steel-bs1nz.run.mcp-use.com/mcp
+- Manufact Cloud dashboard: https://manufact.com/cloud/org-bb5b108a-sifrx/servers/38b23d2a-f688-47b7-8425-59e143dcd6e1
+- Inspector: https://inspector.manufact.com/inspector?autoConnect=https%3A%2F%2Fkeen-steel-bs1nz.run.mcp-use.com%2Fmcp
+
 ## Deployment
 
 Fast Manufact-managed deployment:
@@ -84,3 +90,5 @@ npx -y mcp-use@latest deploy -y --org org-bb5b108a-sifrx
 - Widget screenshot
 - Short walkthrough script
 - Link to related GitHub proof: `mcp-gateway`, `myelin`
+
+See [`APPLICATION_PROOF.md`](./APPLICATION_PROOF.md) for the verified proof package.
