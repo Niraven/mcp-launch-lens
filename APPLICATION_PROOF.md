@@ -6,7 +6,7 @@
 - Manufact Cloud dashboard: https://manufact.com/cloud/org-bb5b108a-sifrx/servers/38b23d2a-f688-47b7-8425-59e143dcd6e1
 - Inspector: https://inspector.manufact.com/inspector?autoConnect=https%3A%2F%2Fkeen-steel-bs1nz.run.mcp-use.com%2Fmcp
 - Public GitHub proof repo: https://github.com/Niraven/mcp-launch-lens
-- Widget screenshot: `launch-lens-redesign.png`
+- Widget screenshot: `launch-lens-redesign-final.png`
 
 ## Verified output
 
@@ -47,4 +47,11 @@ The live MCP URL is deployed on Manufact Cloud, and the dashboard gives the oper
 ## UI redesign proof
 
 - Rebuilt widget with shadcn/Vercel/Linear-style components.
-- Visual proof: `launch-lens-redesign.png`.
+- Visual proof: `launch-lens-redesign-final.png`.
+
+
+## Latest redesign deployment
+
+- Active deployment: `78b2d532-f20d-4a52-897a-f06927d2599b`
+- Final redesign screenshot: `launch-lens-redesign-final.png`
+- GitHub commit: `17c9efb`
