@@ -9,6 +9,7 @@ import {
   BookOpenText,
   CheckCircle2,
   CircleDot,
+  ExternalLink,
   Gauge,
   Handshake,
   Layers3,
@@ -77,10 +78,25 @@ function ScorePanel({ score, verdict }: { score: number; verdict: ProductSearchR
   </aside>;
 }
 
+function VerificationPanel({ verification }: { verification: ProductSearchResultProps["verification"] }) {
+  const tone = verification.status === "complete" ? "strong" : verification.status === "partial" ? "medium" : "weak";
+  return <section className="lens-verification" aria-label={`Evidence status ${verification.status}`}>
+    <div className="lens-verification-head">
+      <div><p className="lens-eyebrow">Evidence integrity</p><h2>{verification.status === "complete" ? "Evidence set complete" : verification.status === "partial" ? "Partially evidenced" : "Insufficient evidence"}</h2></div>
+      <Badge tone={tone}>{verification.evidenceChecks.length}/{verification.evidenceChecks.length + verification.missingChecks.length} evidence categories supplied</Badge>
+    </div>
+    <div className="lens-verification-body">
+      <div><strong>Evidence supplied</strong><p>{verification.evidenceChecks.length ? verification.evidenceChecks.join(" · ") : "No evidence supplied yet."}</p></div>
+      <div><strong>Unlinked categories</strong><p>{verification.missingChecks.length ? verification.missingChecks.join(" · ") : "No unlinked evidence categories."}</p></div>
+    </div>
+    {verification.sourceUrl && <a className="lens-evidence-link" href={verification.sourceUrl} target="_blank" rel="noreferrer"><ExternalLink size={14} />Inspected MCP endpoint</a>}
+  </section>;
+}
+
 function AreaCard({ area, active, onClick }: { area: ReadinessArea; active: boolean; onClick: () => void }) {
   const Icon = areaIcon[area.id] ?? Gauge;
   const tone = scoreTone(area.score);
-  return <button className={`lens-area-card ${active ? "lens-area-card-active" : ""}`} onClick={onClick} type="button">
+  return <button aria-pressed={active} className={`lens-area-card ${active ? "lens-area-card-active" : ""}`} onClick={onClick} type="button">
     <div className="lens-area-card-head">
       <span className={`lens-icon lens-icon-${tone}`}><Icon size={17} strokeWidth={2} /></span>
       <span className="lens-area-score">{area.score}</span>
@@ -136,8 +152,8 @@ const ProductSearchResult: React.FC = () => {
 
   return <McpUseProvider autoSize><AppsSDKUIProvider linkComponent={Link}><main className={`lens-shell lens-theme-${theme}`}>
     <header className="lens-topbar">
-      <div className="lens-brand"><span className="lens-brand-mark"><Gauge size={16} /></span><div><strong>MCP Launch Lens</strong><span>Manufact-ready scorecard</span></div></div>
-      <div className="lens-topbar-meta"><Badge tone={scoreTone(props.score)}>{props.score}/100</Badge><Badge>{props.tools.length} tools</Badge></div>
+      <div className="lens-brand"><span className="lens-brand-mark"><Gauge size={16} /></span><div><strong>MCP Launch Lens</strong><span>Evidence-aware MCP readiness</span></div></div>
+      <div className="lens-topbar-meta"><Badge tone={props.verification.status === "complete" ? "strong" : props.verification.status === "partial" ? "medium" : "weak"}>{props.verification.status === "complete" ? `Evidence ${props.verification.evidenceChecks.length}/${props.verification.evidenceChecks.length + props.verification.missingChecks.length}` : props.verification.status}</Badge><Badge tone={scoreTone(props.score)}>{props.score}/100</Badge><Badge>{props.tools.length} tools</Badge></div>
     </header>
 
     <section className="lens-hero">
@@ -147,28 +163,32 @@ const ProductSearchResult: React.FC = () => {
         <p className="lens-summary">{props.summary}</p>
         <div className="lens-hero-actions">
           <ShellButton className="lens-primary-action" onClick={() => sendFollowUpMessage(`Turn ${props.serverName}'s Launch Lens report into a 60-second Manufact application walkthrough.`)}><Sparkles size={15} />Draft walkthrough</ShellButton>
-          <ShellButton onClick={() => setState({ ...state, selectedArea: "observability" })}><Activity size={15} />View cloud proof</ShellButton>
+          {props.verification.observabilityUrl
+            ? <a className="lens-btn" href={props.verification.observabilityUrl} target="_blank" rel="noreferrer"><Activity size={15} />Open cloud proof<ExternalLink size={13} /></a>
+            : <ShellButton onClick={() => setState({ ...state, selectedArea: "observability" })}><Activity size={15} />See missing cloud proof</ShellButton>}
         </div>
       </div>
       <ScorePanel score={props.score} verdict={props.verdict} />
     </section>
 
+    <VerificationPanel verification={props.verification} />
+
     <section className="lens-readiness-section" aria-label="Readiness areas">
-      <div className="lens-section-heading"><div><p className="lens-eyebrow">Score breakdown</p><h2>Launch-readiness areas</h2></div><ShellButton active={activeArea === "all"} onClick={() => setState({ ...state, selectedArea: "all" })}>All areas</ShellButton></div>
+      <div className="lens-section-heading"><div><p className="lens-eyebrow">Score breakdown</p><h2>Launch-readiness areas</h2></div><ShellButton aria-pressed={activeArea === "all"} active={activeArea === "all"} onClick={() => setState({ ...state, selectedArea: "all" })}>All areas</ShellButton></div>
       <div className="lens-readiness-grid">{props.readiness.map((area) => <AreaCard key={area.id} area={area} active={activeArea === area.id} onClick={() => setState({ ...state, selectedArea: area.id })} />)}</div>
     </section>
 
     <section className="lens-content-grid">
       <div className="lens-findings-column">
         <div className="lens-section-heading lens-findings-heading">
-          <div><p className="lens-eyebrow">Findings</p><h2>What needs attention before launch</h2></div>
+          <div><p className="lens-eyebrow">Findings</p><h2>What the evidence says</h2></div>
           <div className="lens-filter-row">
-            {(["all", "fix", "watch", "pass"] as const).map((filter) => <ShellButton key={filter} active={findingFilter === filter} onClick={() => setState({ ...state, findingFilter: filter })}>{filter === "all" ? "All" : `${severityLabel[filter]} ${counts[filter] ?? 0}`}</ShellButton>)}
+            {(["all", "fix", "watch", "pass"] as const).map((filter) => <ShellButton aria-pressed={findingFilter === filter} key={filter} active={findingFilter === filter} onClick={() => setState({ ...state, findingFilter: filter })}>{filter === "all" ? "All" : `${severityLabel[filter]} ${counts[filter] ?? 0}`}</ShellButton>)}
           </div>
         </div>
         <div className="lens-findings">{visibleFindings.map((finding) => <FindingCard key={finding.id} finding={finding} />)}</div>
       </div>
-      <PriorityPanel actions={props.priorityActions} angles={props.partnerAngles} isPending={isBriefPending} brief={brief?.brief} onGenerate={() => generatePartnerBrief({ company: "Manufact", serverName: props.serverName, targetClient: "ChatGPT Apps and Claude Connectors" })} />
+      <PriorityPanel actions={props.priorityActions} angles={props.partnerAngles} isPending={isBriefPending} brief={brief?.brief} onGenerate={() => generatePartnerBrief({ company: "Manufact", integrationGoal: `Turn ${props.serverName} into an evidence-aware, observable MCP launch`, serverName: props.serverName, targetClient: "ChatGPT Apps and Claude Connectors" })} />
     </section>
   </main></AppsSDKUIProvider></McpUseProvider>;
 };

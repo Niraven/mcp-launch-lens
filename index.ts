@@ -1,7 +1,9 @@
-import { MCPServer, object, text, widget } from "mcp-use/server";
+import { MCPServer, error, object, text, widget } from "mcp-use/server";
 import { z } from "zod";
-import { assessLaunchReadiness, buildPartnerBrief, type MCPToolSpec } from "./src/launchLens";
+import { inspectMcpEndpoint } from "./src/inspectEndpoint";
+import { assessLaunchReadiness, buildPartnerBrief, compareLaunchPaths, type EvidenceInput, type MCPToolSpec } from "./src/launchLens";
 
+const httpsUrl = z.string().url().refine((value) => value.startsWith("https://"), "URL must use HTTPS");
 const toolSpecSchema = z.object({
   name: z.string().min(1).describe("Kebab-case MCP tool name, e.g. 'search-docs'"),
   description: z.string().min(1).describe("What the tool does and when an AI should call it"),
@@ -10,17 +12,44 @@ const toolSpecSchema = z.object({
   externalNetwork: z.boolean().optional().describe("Whether the tool calls external APIs or services"),
   hasTimeout: z.boolean().optional().describe("Whether the tool documents timeout/error behavior"),
   hasExamples: z.boolean().optional().describe("Whether docs include a concrete example for this tool"),
+  hasInputSchema: z.boolean().optional().describe("Whether the tool exposes a meaningful input schema"),
 });
+const verificationSchema = z.object({
+  status: z.enum(["complete", "partial", "insufficient"]),
+  mode: z.enum(["live-endpoint", "manual", "none"]),
+  sourceUrl: z.string().optional(),
+  inspectedAt: z.string().optional(),
+  evidenceChecks: z.array(z.string()),
+  missingChecks: z.array(z.string()),
+  readmeUrl: z.string().optional(),
+  screenshotUrls: z.array(z.string()),
+  observabilityUrl: z.string().optional(),
+  authDocsUrl: z.string().optional(),
+  partnerEvidenceUrl: z.string().optional(),
+});
+const reportSchema = {
+  serverName: z.string(),
+  score: z.number(),
+  verdict: z.enum(["launch-ready", "nearly-ready", "needs-hardening", "insufficient-evidence"]),
+  headline: z.string(),
+  summary: z.string(),
+  readiness: z.array(z.object({ id: z.string(), label: z.string(), score: z.number(), summary: z.string() })),
+  findings: z.array(z.object({ id: z.string(), area: z.enum(["security", "tool-ux", "docs", "observability", "marketplace", "partnerships"]), severity: z.enum(["pass", "watch", "fix"]), title: z.string(), detail: z.string(), action: z.string() })),
+  priorityActions: z.array(z.string()),
+  partnerAngles: z.array(z.string()),
+  tools: z.array(toolSpecSchema),
+  verification: verificationSchema,
+};
 
 const server = new MCPServer({
   name: "mcp-launch-lens",
   title: "MCP Launch Lens",
-  version: "1.0.0",
-  description: "Launch-readiness scorecards for MCP Apps: trust, tool UX, docs, observability, marketplace fit, and partner narrative.",
-  instructions: "Use assess-mcp-launch to audit an MCP server/app before launch. Use generate-partner-brief when the user needs a DevRel or partnership narrative for a specific company. Use compare-launch-paths to choose between Claude, ChatGPT, and generic agent-client launch paths.",
+  version: "1.1.0",
+  description: "Evidence-aware launch-readiness scorecards for MCP Apps: inspect a live endpoint, separate inspected MCP metadata from supplied evidence and unknowns, then turn the gaps into a launch plan.",
+  instructions: "Use assess-mcp-launch with a public HTTPS mcpUrl whenever possible. Missing evidence fails closed and appears as partial or insufficient. Use generate-partner-brief after an assessment, and compare-launch-paths to choose a launch path from the product goal.",
   baseUrl: process.env.MCP_URL || "http://localhost:3000",
   favicon: "favicon.ico",
-  websiteUrl: "https://github.com/Niraven/mcp-gateway",
+  websiteUrl: "https://github.com/Niraven/mcp-launch-lens",
   icons: [{ src: "icon.svg", mimeType: "image/svg+xml", sizes: ["512x512"] }],
 });
 
@@ -28,36 +57,48 @@ server.tool(
   {
     name: "assess-mcp-launch",
     title: "Assess MCP launch readiness",
-    description: "Generate a visual launch-readiness scorecard for an MCP server or app across trust, tool UX, docs, observability, marketplace readiness, and partnerships.",
+    description: "Inspect a public HTTPS MCP endpoint or supplied tool manifest, then generate an evidence-aware visual launch-readiness scorecard.",
     schema: z.object({
-      serverName: z.string().optional().describe("Name of the MCP server or app being assessed"),
+      mcpUrl: httpsUrl.optional().describe("Public HTTPS MCP endpoint to inspect with tools/list; private and local addresses are rejected"),
+      serverName: z.string().optional().describe("Display name; live server metadata wins when mcpUrl is supplied"),
       description: z.string().optional().describe("Short product description or positioning statement"),
-      tools: z.array(toolSpecSchema).optional().describe("MCP tool surface to evaluate; omit for a demo-ready sample"),
+      tools: z.array(toolSpecSchema).optional().describe("Manual tool surface; ignored when mcpUrl is supplied"),
       targetClients: z.array(z.string()).optional().describe("Target clients/marketplaces, e.g. Claude, ChatGPT, Cursor, agent clients"),
-      hasReadme: z.boolean().optional().describe("Whether the repo has a README with setup and usage instructions"),
-      hasScreenshots: z.boolean().optional().describe("Whether the launch package includes product/dashboard screenshots"),
-      hasEvals: z.boolean().optional().describe("Whether evals or example test cases exist"),
-      hasObservability: z.boolean().optional().describe("Whether analytics, logs, evals, and dashboard proof are included"),
-      hasAuthStory: z.boolean().optional().describe("Whether user auth, scopes, or data boundaries are documented"),
+      readmeUrl: httpsUrl.optional().describe("Public README or developer docs evidence"),
+      screenshotUrls: z.array(httpsUrl).optional().describe("Public widget, install, or product screenshots"),
+      observabilityUrl: httpsUrl.optional().describe("Manufact Cloud dashboard or other observability evidence"),
+      authDocsUrl: httpsUrl.optional().describe("Authentication, scopes, permissions, or data-boundary documentation"),
+      partnerEvidenceUrl: httpsUrl.optional().describe("Partner brief, launch plan, or customer outcome evidence"),
     }),
-    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
-    outputSchema: z.object({
-      serverName: z.string(),
-      score: z.number(),
-      verdict: z.enum(["launch-ready", "nearly-ready", "needs-hardening"]),
-      headline: z.string(),
-      summary: z.string(),
-      readiness: z.array(z.object({ id: z.string(), label: z.string(), score: z.number(), summary: z.string() })),
-      findings: z.array(z.object({ id: z.string(), area: z.enum(["security", "tool-ux", "docs", "observability", "marketplace", "partnerships"]), severity: z.enum(["pass", "watch", "fix"]), title: z.string(), detail: z.string(), action: z.string() })),
-      priorityActions: z.array(z.string()),
-      partnerAngles: z.array(z.string()),
-      tools: z.array(toolSpecSchema),
-    }),
-    widget: { name: "product-search-result", invoking: "Scoring MCP launch readiness...", invoked: "Launch scorecard ready" },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
+    outputSchema: z.object(reportSchema),
+    widget: { name: "product-search-result", invoking: "Inspecting MCP launch evidence...", invoked: "Evidence-aware scorecard ready" },
   },
   async (input) => {
-    const report = assessLaunchReadiness({ ...input, tools: input.tools as MCPToolSpec[] | undefined });
-    return widget({ props: report, output: text(`${report.headline}. ${report.priorityActions[0]}`) });
+    try {
+      const inspection = input.mcpUrl ? await inspectMcpEndpoint(input.mcpUrl) : undefined;
+      const evidence: EvidenceInput = {
+        mode: inspection ? "live-endpoint" : input.tools?.length ? "manual" : undefined,
+        sourceUrl: inspection?.endpoint,
+        inspectedAt: inspection?.inspectedAt,
+        readmeUrl: input.readmeUrl,
+        screenshotUrls: input.screenshotUrls,
+        observabilityUrl: input.observabilityUrl,
+        authDocsUrl: input.authDocsUrl,
+        partnerEvidenceUrl: input.partnerEvidenceUrl,
+      };
+      const report = assessLaunchReadiness({
+        serverName: inspection?.serverName || input.serverName,
+        description: input.description,
+        tools: inspection?.tools || input.tools as MCPToolSpec[] | undefined,
+        targetClients: input.targetClients,
+        evidence,
+      });
+      return widget({ props: report, output: text(`${report.headline}. Evidence set: ${report.verification.status}. ${report.priorityActions[0]}`) });
+    } catch (cause) {
+      const detail = cause instanceof Error ? cause.message : "Unknown endpoint inspection failure.";
+      return error(`Could not inspect MCP endpoint: ${detail}`);
+    }
   }
 );
 
@@ -65,20 +106,26 @@ server.tool(
   {
     name: "generate-partner-brief",
     title: "Generate partner launch brief",
-    description: "Create a concise DevRel/partnership brief that turns an MCP integration into a launchable story with proof points.",
+    description: "Create a concise DevRel/partnership brief from a supplied MCP integration goal and optional evidence-aware report inputs.",
     schema: z.object({
-      company: z.string().optional().describe("Partner or target company name"),
-      integrationGoal: z.string().optional().describe("What the integration is trying to accomplish"),
-      targetClient: z.string().optional().describe("Primary client or marketplace, e.g. ChatGPT Apps, Claude Connectors, Cursor"),
-      serverName: z.string().optional().describe("MCP server/app name to assess alongside the brief"),
-      tools: z.array(toolSpecSchema).optional().describe("Optional tool surface to score before writing the brief"),
+      company: z.string().min(1).describe("Partner or target company name"),
+      integrationGoal: z.string().min(1).describe("Specific user or partner outcome for the integration"),
+      targetClient: z.string().min(1).describe("Primary client or marketplace, e.g. ChatGPT Apps or Claude Connectors"),
+      serverName: z.string().optional().describe("Optional MCP server name when a report context is supplied"),
+      tools: z.array(toolSpecSchema).optional().describe("Optional manual tool surface for a lightweight readiness context"),
     }),
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
-    outputSchema: z.object({ brief: z.string(), score: z.number().optional(), verdict: z.string().optional(), proofChecklist: z.array(z.string()) }),
+    outputSchema: z.object({ brief: z.string(), score: z.number().optional(), verdict: z.string().optional(), verification: z.string().optional(), proofChecklist: z.array(z.string()) }),
   },
   async (input) => {
-    const report = input.serverName || input.tools?.length ? assessLaunchReadiness({ serverName: input.serverName, tools: input.tools as MCPToolSpec[] | undefined, hasReadme: true }) : undefined;
-    return object({ brief: buildPartnerBrief({ ...input, report }), score: report?.score, verdict: report?.verdict, proofChecklist: ["Live MCP URL", "Manufact Cloud dashboard URL", "Widget screenshot", "README with setup, examples, and launch narrative", "60-second video script for application evidence"] });
+    const report = input.serverName || input.tools?.length ? assessLaunchReadiness({ serverName: input.serverName, tools: input.tools as MCPToolSpec[] | undefined, targetClients: [input.targetClient], evidence: { mode: "manual" } }) : undefined;
+    return object({
+      brief: buildPartnerBrief({ ...input, report }),
+      score: report?.score,
+      verdict: report?.verdict,
+      verification: report?.verification.status,
+      proofChecklist: ["Live MCP endpoint inspection", "Linked README", "Manufact Cloud dashboard", "Focused widget screenshot", "Authentication and data-boundary documentation", "Partner brief or outcome evidence", "60-second walkthrough"],
+    });
   }
 );
 
@@ -86,19 +133,12 @@ server.tool(
   {
     name: "compare-launch-paths",
     title: "Compare MCP launch paths",
-    description: "Compare Claude Connectors, ChatGPT Apps, and generic agent-client launch paths for an MCP product.",
-    schema: z.object({ product: z.string().optional().describe("MCP product or server name"), primaryGoal: z.string().optional().describe("Main launch goal: demo, marketplace, customer pilot, or partner integration") }),
+    description: "Choose among Manufact Cloud, ChatGPT Apps, Claude Connectors, and generic MCP clients based on the actual launch goal.",
+    schema: z.object({ product: z.string().optional().describe("Product or MCP server name"), primaryGoal: z.string().optional().describe("Main launch goal: visual demo, managed deployment, enterprise connector, or protocol portability") }),
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     outputSchema: z.object({ recommendation: z.string(), paths: z.array(z.object({ path: z.string(), fit: z.string(), proof: z.string(), risk: z.string() })) }),
   },
-  async ({ product, primaryGoal }) => {
-    const name = product || "MCP Launch Lens";
-    return object({ recommendation: `${name} should lead with a Manufact Cloud deployment and widget-backed demo, then package the same proof for Claude, ChatGPT, and agent clients. Goal: ${primaryGoal || "application-ready proof"}.`, paths: [
-      { path: "Manufact Cloud", fit: "Best immediate proof: live URL, dashboard, logs, analytics, evals, deploy flow.", proof: "MCP URL + dashboard URL + scorecard screenshot.", risk: "Requires CLI auth before deploy." },
-      { path: "ChatGPT Apps", fit: "Best visual story because the widget is the product experience.", proof: "Widget interaction screenshot and model-facing output summary.", risk: "Needs tight UX, CSP, and client compatibility polish." },
-      { path: "Claude / generic MCP clients", fit: "Best for protocol credibility and tool-call clarity.", proof: "Tool list, example calls, structured outputs, README examples.", risk: "Less visual unless paired with screenshots and narrative." },
-    ] });
-  }
+  async (input) => object(compareLaunchPaths(input))
 );
 
 server.listen().then(() => console.log("MCP Launch Lens server running"));
