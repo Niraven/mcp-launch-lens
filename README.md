@@ -18,7 +18,7 @@ MCP Launch Lens is a widget-backed MCP App deployed on Manufact Cloud. It connec
 - **MCP endpoint:** <https://keen-steel-bs1nz.run.mcp-use.com/mcp>
 - **Manufact Inspector:** <https://inspector.manufact.com/inspector?autoConnect=https%3A%2F%2Fkeen-steel-bs1nz.run.mcp-use.com%2Fmcp>
 - **Manufact Cloud dashboard:** <https://manufact.com/cloud/org-bb5b108a-sifrx/servers/38b23d2a-f688-47b7-8425-59e143dcd6e1>
-- **Application proof and Loom script:** [`APPLICATION_PROOF.md`](./APPLICATION_PROOF.md)
+- **Live verification evidence:** [`APPLICATION_PROOF.md`](./APPLICATION_PROOF.md)
 
 ## The problem
 
@@ -221,7 +221,7 @@ resources/product-search-result/widget.tsx    interactive MCP Apps widget
 resources/product-search-result/types.ts      widget/report schemas
 resources/styles.css                           theme and responsive UI
 scripts/test-launch-lens.ts                    deterministic regression checks
-APPLICATION_PROOF.md                           deployment proof + Loom script
+APPLICATION_PROOF.md                           deployment verification evidence
 ```
 
 ## Deploy to Manufact Cloud
@@ -243,19 +243,6 @@ For a platform-managed source upload instead:
 ```bash
 npx -y mcp-use@latest deploy --no-github -y --org org-bb5b108a-sifrx
 ```
-
-## Loom walkthrough
-
-A clean 75–90 second recording flow:
-
-1. **Problem (10s):** “A valid MCP handshake does not mean an integration is ready to launch.”
-2. **Live proof (15s):** show the Manufact endpoint and Cloud dashboard.
-3. **Inspection (15s):** call `assess-mcp-launch` against the public endpoint and point out that it reads the real `tools/list` surface.
-4. **Widget (25s):** show evidence completeness, the six scores, finding filters, and the ship plan.
-5. **DevRel motion (15s):** generate a partner brief and compare launch paths.
-6. **Close (10s):** “This is how I think about DevRel and partnerships: make the product legible, make the proof reproducible, and turn technical gaps into a launch motion.”
-
-The exact talk track is in [`APPLICATION_PROOF.md`](./APPLICATION_PROOF.md).
 
 ## Positioning and related work
 
