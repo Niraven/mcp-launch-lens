@@ -24,11 +24,14 @@ A local production build was connected through `mcp-use client` and asked to ins
 
 ```text
 server:   mcp-launch-lens
-score:    91/100
-verdict:  launch-ready
+version:  1.1.0
+score:    89/100
+verdict:  nearly-ready
 evidence: complete
-findings: 6 pass · 0 watch · 0 fix
+findings: 5 pass · 1 watch · 0 fix
 ```
+
+The single watch item is `security-metadata-unknown`: the live protocol advertises open-world behavior for `assess-mcp-launch`, but MCP tool annotations do not independently prove its auth and timeout boundaries. v1.1 therefore refuses to emit `launch-ready` or a security pass until those declarations are explicit.
 
 The same build was checked against its failure boundaries:
 
@@ -103,7 +106,7 @@ Before recording:
 
 **Screen:** score, evidence panel, six readiness cards, then filters.
 
-> “The result is a typed, interactive scorecard across trust, agent tool UX, docs, observability, marketplace readiness, and partner narrative. The important part is the evidence model: endpoint metadata is inspected directly, links are labeled as supplied evidence, and missing proof fails closed. Empty input scores 34—not 90.”
+> “The result is a typed, interactive scorecard across trust, agent tool UX, docs, observability, marketplace readiness, and partner narrative. The important part is the evidence model: endpoint metadata is inspected directly, links are labeled as supplied evidence, and missing proof fails closed. Empty input scores 34, and even a complete evidence set stays nearly ready when security declarations are unknown.”
 
 ### 1:08–1:22 — DevRel and partnerships
 
@@ -113,7 +116,7 @@ Before recording:
 
 ### 1:22–1:30 — Close
 
-**Screen:** return to the 91/100 overview.
+**Screen:** return to the live 89/100, nearly-ready overview.
 
 > “This is how I want to contribute at Manufact: understand the protocol deeply, make the product legible, make the proof reproducible, and help developers and partners get from working MCP code to a launch people can trust.”
 
